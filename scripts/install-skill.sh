@@ -6,8 +6,8 @@
 # execute code directly. Even so, a malicious skill can social-engineer the agent.
 #
 # Usage:
-#   bash scripts/install-skill.sh <skill-dir>                     # warns if no clearance
-#   bash scripts/install-skill.sh <skill-dir> --clearance <report.json>  # validates report
+#   bash scripts/install-skill.sh <skill-dir> --clearance <report.json>  # install with forge clearance (required)
+#   bash scripts/install-skill.sh <skill-dir>                     # BLOCKED: clearance report required
 #   bash scripts/install-skill.sh --list                           # list installed skills
 #   bash scripts/install-skill.sh --remove <name>                  # remove a skill (user-side destructive op)
 #
@@ -202,15 +202,11 @@ else:
         echo -e "  Clearance: ${GREEN}$report_valid${NC}"
     else
         echo ""
-        echo -e "${YELLOW}  WARNING: No clearance report provided.${NC}"
-        echo "  This skill has NOT been scanned by clawhub-forge."
-        echo "  You should run: cd components/clawhub-forge && make scan-one SKILL=$skill_name"
-        echo ""
-        read -rp "  Install without clearance? [y/N] " confirm
-        if [ "${confirm,,}" != "y" ]; then
-            echo "  Cancelled."
-            exit 0
-        fi
+        echo -e "${RED}  ERROR: Clearance report required.${NC}"
+        echo "  Skills must be vetted by clawhub-forge before installation."
+        echo "  Run: cd components/clawhub-forge && make scan-one SKILL=$skill_name"
+        echo "  Then: $0 $skill_dir --clearance <path-to-clearance-report.json>"
+        exit 1
     fi
 
     # Check container is running
@@ -241,6 +237,14 @@ else:
         echo -e "${YELLOW}  WARNING: size mismatch — source=$skill_size, installed=$installed_size${NC}"
     fi
 
+    # Write .trust file — SHA-256 of SKILL.md, used by entrypoint integrity check
+    local skill_hash
+    skill_hash=$(sha256sum "$skill_md" | cut -d' ' -f1)
+    $RUNTIME exec "$CONTAINER" sh -c \
+        "printf 'VERIFY_HASH=sha256:%s\n' '$skill_hash' > '$WORKSPACE_SKILLS/$skill_name/.trust'" 2>/dev/null && \
+        echo -e "  ${GREEN}Trust record written (.trust)${NC}" || \
+        echo -e "${YELLOW}  WARNING: Could not write .trust file — entrypoint integrity check will block this skill${NC}"
+
     echo ""
     echo "  The agent can now reference this skill from its workspace."
     echo ""
@@ -262,7 +266,7 @@ case "${1:-}" in
         echo "OpenClaw-Vault: Skill Installation"
         echo ""
         echo "Usage:"
-        echo "  $0 <skill-dir>                            Install a skill (warns without clearance)"
+        echo "  $0 <skill-dir> --clearance <report.json>  Install a skill (clearance required)"
         echo "  $0 <skill-dir> --clearance <report.json>  Install with forge clearance report"
         echo "  $0 --list                                 List installed skills"
         echo "  $0 --remove <name>                        Remove an installed skill"

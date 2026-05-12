@@ -6,7 +6,9 @@
 # 2. Wait for mitmproxy CA cert
 # 3. Install or preserve auth profile
 # 4. Lock config read-only (prevent agent self-modification)
-# 5. Exec into OpenClaw
+# 5. Install container constraints documentation
+# 5.5. Verify installed skill integrity (abort if any skill lacks clearance or hash mismatches)
+# 6. Exec into OpenClaw
 
 CONFIG_SRC="/opt/openclaw-hardening.json5"
 CONFIG_DST="/home/vault/.openclaw/openclaw.json"
@@ -182,6 +184,51 @@ CONSTRAINTSEOF
     echo "[vault] Constraints documentation installed"
 else
     echo "[vault] Constraints documentation preserved"
+fi
+
+# --- 5.5. Verify installed skill integrity ---
+# Abort startup if any skill in the workspace lacks a .trust record or has a hash mismatch.
+# install-skill.sh writes a .trust file containing the SHA-256 of SKILL.md at install time.
+# This check ensures no skill has been tampered with between install and container start,
+# and that no skill was dropped in without going through install-skill.sh (which requires clearance).
+SKILLS_DIR="/home/vault/.openclaw/workspace/skills"
+if [ -d "$SKILLS_DIR" ]; then
+    skill_fail=0
+
+    # Check every skill directory that has a SKILL.md
+    for skill_dir in "$SKILLS_DIR"/*/; do
+        [ -d "$skill_dir" ] || continue
+        [ -f "${skill_dir}SKILL.md" ] || continue
+        sname=$(basename "$skill_dir")
+        trust_file="${skill_dir}.trust"
+
+        if [ ! -f "$trust_file" ]; then
+            echo "[vault] ERROR: Skill '$sname' has no clearance record (.trust missing). Refusing to start." >&2
+            skill_fail=1
+            continue
+        fi
+
+        stored=$(grep '^VERIFY_HASH=' "$trust_file" 2>/dev/null | cut -d= -f2)
+        if [ -z "$stored" ]; then
+            echo "[vault] ERROR: Skill '$sname' .trust file has no VERIFY_HASH entry. Refusing to start." >&2
+            skill_fail=1
+            continue
+        fi
+
+        current="sha256:$(sha256sum "${skill_dir}SKILL.md" | cut -d' ' -f1)"
+        if [ "$current" != "$stored" ]; then
+            echo "[vault] ERROR: Skill '$sname' hash mismatch — possible tampering. Refusing to start." >&2
+            skill_fail=1
+        fi
+    done
+
+    if [ "$skill_fail" -eq 1 ]; then
+        echo "[vault] Startup aborted: unverified skills detected." >&2
+        echo "[vault] Remove affected skills or reinstall via: bash scripts/install-skill.sh --clearance <report>" >&2
+        exit 1
+    fi
+
+    echo "[vault] Skill integrity verified."
 fi
 
 # --- 6. Start OpenClaw ---
