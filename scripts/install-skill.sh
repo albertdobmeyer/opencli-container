@@ -152,14 +152,18 @@ else:
     echo "  Skill:    $skill_name"
     echo "  File:     $skill_md ($skill_size bytes)"
 
+    # Auto-detect clearance report from the skill directory (forge export layout)
+    if [ -z "$clearance_file" ] && [ -f "$skill_dir/clearance-report.json" ]; then
+        clearance_file="$skill_dir/clearance-report.json"
+        echo "  Report:   $clearance_file (auto-detected)"
+    fi
+
     # Validate clearance report if provided
     if [ -n "$clearance_file" ]; then
         if [ ! -f "$clearance_file" ]; then
             echo -e "${RED}ERROR: Clearance report not found: $clearance_file${NC}"
             exit 1
         fi
-
-        echo "  Report:   $clearance_file"
 
         local report_valid
         report_valid=$(python3 -c "
@@ -204,8 +208,12 @@ else:
         echo ""
         echo -e "${RED}  ERROR: Clearance report required.${NC}"
         echo "  Skills must be vetted by clawhub-forge before installation."
-        echo "  Run: cd components/clawhub-forge && make scan-one SKILL=$skill_name"
-        echo "  Then: $0 $skill_dir --clearance <path-to-clearance-report.json>"
+        echo "  Option A (recommended): use the forge export directory, which bundles the report:"
+        echo "    cd components/clawhub-forge && make export SKILL=$skill_name"
+        echo "    bash scripts/install-skill.sh ../clawhub-forge/exports/$skill_name/"
+        echo "  Option B: run certification and pass the report explicitly:"
+        echo "    cd components/clawhub-forge && make certify SKILL=$skill_name"
+        echo "    bash scripts/install-skill.sh $skill_dir --clearance <path-to-clearance-report.json>"
         exit 1
     fi
 
