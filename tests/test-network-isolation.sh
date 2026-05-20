@@ -68,6 +68,12 @@ check "Direct internet blocked (no gateway)" \
 check "IP-based request blocked via proxy" \
     "node -e \"const h=require('http');const r=h.get({host:'vault-proxy',port:8080,path:'http://1.1.1.1/',headers:{Host:'1.1.1.1'},timeout:5000},res=>{process.exit(res.statusCode===403?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})\""
 
+# Test 4a: Loopback IP-literal blocked (DNS-rebinding floor — guards against
+# an allowlisted domain being trivially swapped for a loopback request).
+# Companion unit test: components/opencli-container/proxy/test_vault_proxy.py
+check "Loopback IP literal blocked (127.0.0.1)" \
+    "node -e \"const h=require('http');const r=h.get({host:'vault-proxy',port:8080,path:'http://127.0.0.1/',headers:{Host:'127.0.0.1'},timeout:5000},res=>{process.exit(res.statusCode===403?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})\""
+
 # Test 5: Case-insensitive blocking — EVIL.COM should also be blocked
 check "Case insensitive blocking (EVIL.COM)" \
     "node -e \"const h=require('http');const r=h.get({host:'vault-proxy',port:8080,path:'http://EVIL.COM/',headers:{Host:'EVIL.COM'},timeout:5000},res=>{process.exit(res.statusCode===403?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})\""

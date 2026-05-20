@@ -4,7 +4,7 @@
 
 A hardened container harness for the [OpenClaw](https://github.com/anthropics/openclaw) autonomous agent runtime. Provides runtime containment for an autonomous AI agent that would otherwise have full access to the host system.
 
-This repository is the runtime-containment module of the [OpenTrApp](https://github.com/albertdobmeyer/opentrapp) distribution; it ships as a git submodule and contributes the `vault-agent` and `vault-proxy` containers to the four-container perimeter.
+This repository is the runtime-containment module of the [OpenTrApp](https://github.com/albertdobmeyer/opentrapp) distribution; it ships as a git submodule and contributes the `vault-agent`, `vault-proxy` (L7 policy), and `vault-egress` (L3 policy + pinned DoT resolver) containers to the five-container perimeter. See [ADR-0009](https://github.com/albertdobmeyer/opentrapp/blob/main/docs/adr/0009-five-container-perimeter.md) for the L7/L3 split rationale.
 
 **Author:** [@albertdobmeyer](https://github.com/albertdobmeyer)
 
